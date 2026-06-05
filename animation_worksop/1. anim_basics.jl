@@ -1,4 +1,4 @@
-using Pkg; Pkg.activate(".")
+using Pkg; Pkg.activate(@__DIR__)
 
 # To install required packages, uncomment and run the line below:
 # Pkg.add(["CairoMakie", "GLMakie", "Animations", "Observables"])
@@ -21,11 +21,11 @@ x[] = 1             # update
 x[]                 # read
 x
 
-x = Observable(0.0) # direct construction
-x2 = Observable{Real}(0.0) # explicit type annotation
-x3 = Observable{Any}(0.0)
+x = Observable(0.0) # stores Float64 values; good when you know the value type
+x2 = Observable{Real}(0.0) # allows any Real number, e.g. Float64, Int, Rational
+x3 = Observable{Any}(0.0) # accepts any type
 
-points = Observable(Point2f[(0, 0)]) #vector of points
+points = Observable(Point2f[(0, 0)]) # a changing vector of 2D points, useful for plots that update
 
 # 2. creating a listener (callback)
 # on(x) = when x changes, run this code
@@ -67,7 +67,6 @@ y[]   # 25
 
 
 health = Observable(100)
-
 status = @lift(
     $health <= 0  ? "💀 dead" :
     $health < 30  ? "🟥 critical" :
@@ -75,8 +74,6 @@ status = @lift(
                     "🟩 healthy"
 )
 
-
-# How to update an observable
 x[] = 1.0
 health[] = 80
 status[]   # "🟩 healthy"
