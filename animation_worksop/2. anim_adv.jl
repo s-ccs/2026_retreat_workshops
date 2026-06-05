@@ -257,6 +257,43 @@ begin
     eeg3 = 0.5 .* sin.(12 .* time .+ 2.0) .+ 0.10 .* randn(length(time))
 end
 
+function cat_stimulus(n = 180)
+    img = fill(RGBf(0.96, 0.95, 0.90), n, n)
+
+    for row in 1:n, col in 1:n
+        x = (col - 0.5) / n
+        y = (row - 0.5) / n
+
+        face = ((x - 0.5) / 0.32)^2 + ((y - 0.47) / 0.28)^2 < 1
+        left_ear = y > 0.63 && y < 0.92 && abs(x - 0.32) < 0.55 * (y - 0.63)
+        right_ear = y > 0.63 && y < 0.92 && abs(x - 0.68) < 0.55 * (y - 0.63)
+        left_eye = ((x - 0.39) / 0.045)^2 + ((y - 0.52) / 0.06)^2 < 1
+        right_eye = ((x - 0.61) / 0.045)^2 + ((y - 0.52) / 0.06)^2 < 1
+        nose = abs(x - 0.5) + 1.6abs(y - 0.42) < 0.05
+        mouth = abs((y - 0.34) - 0.45abs(x - 0.5)) < 0.012 && abs(x - 0.5) < 0.12
+        whiskers = abs(y - 0.43) < 0.006 && 0.17 < x < 0.38 ||
+                   abs(y - 0.38 - 0.16(x - 0.28)) < 0.006 && 0.17 < x < 0.38 ||
+                   abs(y - 0.48 + 0.16(x - 0.28)) < 0.006 && 0.17 < x < 0.38 ||
+                   abs(y - 0.43) < 0.006 && 0.62 < x < 0.83 ||
+                   abs(y - 0.38 + 0.16(x - 0.72)) < 0.006 && 0.62 < x < 0.83 ||
+                   abs(y - 0.48 - 0.16(x - 0.72)) < 0.006 && 0.62 < x < 0.83
+
+        if face || left_ear || right_ear
+            img[row, col] = RGBf(0.98, 0.72, 0.38)
+        end
+        if left_eye || right_eye || mouth || whiskers
+            img[row, col] = RGBf(0.08, 0.07, 0.06)
+        end
+        if nose
+            img[row, col] = RGBf(0.95, 0.30, 0.42)
+        end
+    end
+
+    img
+end
+
+stimulus_img = permutedims(cat_stimulus())
+
 # ------------------------------------------------------------
 # Figure
 # ------------------------------------------------------------
@@ -316,12 +353,8 @@ end
 # ------------------------------------------------------------
 
 begin
-    # placeholder image / stimulus area
-    poly!(
-        ax_img,
-        Point2f[(0, 0), (1, 0), (1, 1), (0, 1)];
-        color = :gray90
-    )
+    # in-memory stimulus image
+    image!(ax_img, 0..1, 0..1, stimulus_img; interpolate = false)
 
     # gaze path so far
     lines!(ax_img, path_x, path_y, linewidth = 3)
@@ -364,3 +397,78 @@ begin
 end
 
 display(fig)
+
+# ------------------------------------------------------------
+# GIF without slider
+# ------------------------------------------------------------
+
+function record_et_eeg_gif(filename = joinpath(@__DIR__, "output", "et_eeg_cat.gif"); framerate = 30)
+    mkpath(dirname(filename))
+
+    gif_fig = Figure(size = (900, 660))
+
+    gif_ax_img = Axis(
+        gif_fig[1, 1],
+        title = "Stimulus + gaze",
+        aspect = DataAspect(),
+        tellwidth = false
+    )
+
+    hidedecorations!(gif_ax_img)
+    hidespines!(gif_ax_img)
+
+    gif_ax_eeg = Axis(
+        gif_fig[2, 1],
+        xlabel = "Time [s]",
+        ylabel = "EEG channels",
+        title = "EEG signal"
+    )
+
+    frame_idx = Observable(1)
+
+    gif_current_time = @lift(time[$frame_idx])
+    gif_current_gaze_x = @lift(gaze_x[$frame_idx])
+    gif_current_gaze_y = @lift(gaze_y[$frame_idx])
+
+    gif_path_x = @lift(gaze_x[1:$frame_idx])
+    gif_path_y = @lift(gaze_y[1:$frame_idx])
+
+    gif_eeg_time = @lift(time[1:$frame_idx])
+    gif_eeg1_path = @lift(eeg1[1:$frame_idx] .+ 2)
+    gif_eeg2_path = @lift(eeg2[1:$frame_idx] .+ 0)
+    gif_eeg3_path = @lift(eeg3[1:$frame_idx] .- 2)
+
+    image!(gif_ax_img, 0..1, 0..1, stimulus_img; interpolate = false)
+    lines!(gif_ax_img, gif_path_x, gif_path_y, linewidth = 3)
+    scatter!(gif_ax_img, gif_current_gaze_x, gif_current_gaze_y, markersize = 20)
+
+    xlims!(gif_ax_img, 0, 1)
+    ylims!(gif_ax_img, 0, 1)
+
+    lines!(gif_ax_eeg, gif_eeg_time, gif_eeg1_path, label = "HEOGR")
+    lines!(gif_ax_eeg, gif_eeg_time, gif_eeg2_path, label = "Cz")
+    lines!(gif_ax_eeg, gif_eeg_time, gif_eeg3_path, label = "Iz")
+    vlines!(gif_ax_eeg, gif_current_time, linewidth = 3)
+
+    xlims!(gif_ax_eeg, first(time), last(time))
+    ylims!(gif_ax_eeg, -3, 3.5)
+
+    axislegend(gif_ax_eeg, position = :rt)
+
+    Label(
+        gif_fig[3, 1],
+        @lift("Current time = $(round($gif_current_time, digits = 3)) s")
+    )
+
+    colsize!(gif_fig.layout, 1, Relative(1))
+    rowsize!(gif_fig.layout, 1, Relative(0.48))
+    rowsize!(gif_fig.layout, 2, Relative(0.47))
+    rowsize!(gif_fig.layout, 3, Fixed(30))
+
+    record(gif_fig, filename, 1:length(time); framerate = framerate) do i
+        frame_idx[] = i
+    end
+end
+
+# Run this line when you want to create the GIF:
+# record_et_eeg_gif()
