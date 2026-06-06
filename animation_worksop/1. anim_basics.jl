@@ -1,12 +1,10 @@
 using Pkg; Pkg.activate(@__DIR__)
 
-
 # To install required packages, uncomment and run the line below:
-# Pkg.add(["CairoMakie", "GLMakie", "Animations", "Observables"])
+# Pkg.add(["GLMakie", "Animations", "Observables"])
 using Observables
 using GLMakie
 using Animations
-using CairoMakie
 
 
 # I. Observables
@@ -102,6 +100,42 @@ sum_value[]   # 13
 
 b[] = 100
 sum_value[]   # 110
+
+# 5. obs[] = value vs obs.val = value
+# obs[] = value changes the value AND notifies listeners.
+# obs.val = value only changes the stored value silently.
+
+score = Observable(0)
+
+on(score) do value
+    println("Score listener saw: $value")
+end
+
+double_score = @lift(2 * $score)
+
+score[] = 10
+# prints: Score listener saw: 10
+
+score[]          # 10
+double_score[]   # 20
+
+score.val = 20
+# prints nothing, because listeners were not notified
+
+score[]          # 20
+double_score[]   # still 20, because the lifted value did not update
+
+notify(score)
+# prints: Score listener saw: 20
+
+double_score[]   # now 40
+
+# In normal plotting/animation code, prefer:
+score[] = 30
+
+# Use obs.val = value only when you deliberately want a silent update
+# and know when/how you will call notify(obs).
+
 ##############
 
 # II. Simple animations
@@ -117,9 +151,10 @@ ax = Axis(fig[1, 1], xlabel = "x", ylabel = "sin(x + phase)")
 lines!(ax, xs, ys)
 ylims!(ax, -1.2, 1.2)
 
-mkpath("output")
+output_dir = joinpath(@__DIR__, "output")
+mkpath(output_dir)
 
-record(fig, "output/sine_wave.mp4", range(0, 2π, length = 120); framerate = 30) do φ
+record(fig, joinpath(output_dir, "sine_wave.mp4"), range(0, 2π, length = 120); framerate = 30) do φ
     phase[] = φ
 end
 
@@ -220,5 +255,3 @@ for τ in range(0, 1, length = 120)
     t[] = τ
     sleep(1 / 30)
 end
-
-

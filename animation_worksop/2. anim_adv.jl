@@ -1,10 +1,9 @@
 using Pkg; Pkg.activate(@__DIR__)
 
-#Pkg.add(["CairoMakie", "GLMakie", "Animations", "Observables", "Pluto"])
+#Pkg.add(["GLMakie", "Animations", "Observables", "Pluto"])
 using Observables
 using GLMakie
 using Animations
-using CairoMakie
 
 
 # 1. play around with easing functions
