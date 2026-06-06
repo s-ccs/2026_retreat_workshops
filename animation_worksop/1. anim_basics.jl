@@ -1,5 +1,6 @@
 using Pkg; Pkg.activate(@__DIR__)
 
+
 # To install required packages, uncomment and run the line below:
 # Pkg.add(["CairoMakie", "GLMakie", "Animations", "Observables"])
 using Observables
